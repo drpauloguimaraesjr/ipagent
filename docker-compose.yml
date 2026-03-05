@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Cérebro: Modelo LLM Local Ex: BioMistral ou Llama 3
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ipagent-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Interface Web e Transcritor / RAG
+  ipagent_web:
+    build: .
+    container_name: ipagent-web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - IPAGENT_OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  ollama_models:

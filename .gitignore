@@ -1,0 +1,19 @@
+# Diretórios Python Padrão
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Diretórios de Dados que NUNCA vão pro GitHub
+# Contêm os seus PDFs e Transcrições (Sigilo Médico)
+data/
+*.db
+
+# Modelos do Whisper e Ollama pesados que não vão pro Github
+models/
+*.gguf
+*.bin
+
+# Outros
+.DS_Store
+*.log
