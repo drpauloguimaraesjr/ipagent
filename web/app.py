@@ -58,23 +58,107 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         """Página principal."""
         return render_template('index.html')
 
+    # ==========================================
+    # Lógica do Painel Administrador e API Keys
+    # ==========================================
     import secrets
     import os
-    
-    @app.route('/api/generate-key', methods=['POST'])
-    def generate_api_key():
-        """Gera uma nova chave de API para integrações."""
-        new_key = f"sk-IPagent-{secrets.token_hex(8)}"
+    import json
+    from datetime import datetime
+    from functools import wraps
+
+    API_KEYS_FILE = "api_keys.json"
+
+    def load_keys():
+        if not os.path.exists(API_KEYS_FILE):
+            return []
+        try:
+            with open(API_KEYS_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            return []
+
+    def save_keys(keys_list):
+        with open(API_KEYS_FILE, "w") as f:
+            json.dump(keys_list, f, indent=4)
+
+    def validate_api_key(f):
+        """Decorador para proteger rotas. Se uma chave for enviada, ela é estritamente validada."""
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            auth = request.headers.get("Authorization")
+            if auth and auth.startswith("Bearer "):
+                token = auth.split(" ")[1]
+                keys = load_keys()
+                is_valid = any(k["key"] == token and k.get("active", True) for k in keys)
+                if not is_valid:
+                    return jsonify({"error": "Acesso Negado: Chave de API inválida ou desativada no Painel Admin do IPagent."}), 403
+            # Nota: para manter o site UI atual (que não envia chave) funcionando, permitimos requests sem Auth.
+            # Numa versão de produção fechada, você exigiria Auth em todas as chamadas exceto originadas da UI.
+            return f(*args, **kwargs)
+        return decorated
+
+    @app.route('/admin')
+    def admin_dashboard():
+        """Página do Painel de Controle de APIs."""
+        return render_template('admin.html')
+
+    @app.route('/api/admin/keys', methods=['GET'])
+    def get_api_keys():
+        """Lista todas as chaves."""
+        return jsonify({"keys": load_keys()})
+
+    @app.route('/api/admin/generate', methods=['POST'])
+    def create_api_key():
+        """Gera uma nova chave registrada."""
+        data = request.json or {}
+        name = data.get('name', 'Sistema Externo Desconhecido')
         
-        # Salva chave no disco para logs/teste
-        with open("api_keys.txt", "a") as f:
-            f.write(f"{new_key}\n")
+        new_key = f"sk-IPagent-{secrets.token_hex(16)}"
+        
+        key_record = {
+            "name": name,
+            "key": new_key,
+            "created_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "active": True
+        }
+        
+        keys = load_keys()
+        keys.append(key_record)
+        save_keys(keys)
             
         return jsonify({
             "success": True, 
-            "message": "Chave de Integração gerada!",
             "api_key": new_key
         })
+
+    @app.route('/api/admin/toggle', methods=['POST'])
+    def toggle_api_key():
+        """Desliga ou Liga uma chave."""
+        data = request.json or {}
+        key_to_toggle = data.get('key')
+        activate = data.get('active', True)
+        
+        keys = load_keys()
+        for k in keys:
+            if k["key"] == key_to_toggle:
+                k["active"] = activate
+                break
+        save_keys(keys)
+        return jsonify({"success": True})
+
+    @app.route('/api/admin/delete', methods=['POST'])
+    def delete_api_key():
+        """Deleta permanentemente uma chave."""
+        data = request.json or {}
+        key_to_delete = data.get('key')
+        
+        keys = load_keys()
+        keys = [k for k in keys if k["key"] != key_to_delete]
+        save_keys(keys)
+        return jsonify({"success": True})
+
+
 
     @app.route('/api/status')
     def api_status():
@@ -111,6 +195,7 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         return jsonify({"devices": [], "error": "Audio não inicializado"})
 
     @app.route('/api/chat', methods=['POST'])
+    @validate_api_key
     def api_chat():
         """Endpoint de chat com o agente."""
         if not agent:
@@ -129,6 +214,7 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         })
 
     @app.route('/api/analyze', methods=['POST'])
+    @validate_api_key
     def api_analyze():
         """Analisa a transcrição atual."""
         if not agent:
@@ -142,6 +228,7 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         return jsonify({"analysis": analysis})
 
     @app.route('/api/soap', methods=['POST'])
+    @validate_api_key
     def api_soap():
         """Gera nota SOAP da transcrição atual."""
         if not agent:
