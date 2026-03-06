@@ -34,8 +34,9 @@ def main():
     agent = MedicalAgent(config.agent, memory=memory)
     agent.initialize()
     
-    transcriber = RealtimeTranscriber(config.transcriber)
-    transcriber.initialize()
+    # transcriber = RealtimeTranscriber(config.transcriber)
+    # transcriber.initialize()
+    transcriber = None
     
     data_collector = DataCollector(config.training)
     
