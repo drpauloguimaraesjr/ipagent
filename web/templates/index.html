@@ -68,6 +68,17 @@
         </div>
 
         <div class="flex items-center gap-4">
+            <button id="btn-api"
+                class="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-full text-sm font-medium transition-colors border border-indigo-100">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4">
+                    </path>
+                </svg>
+                Gerar API Key
+            </button>
+
             <button id="btn-knowledge"
                 class="flex items-center gap-2 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-full text-sm font-medium transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -319,70 +330,97 @@
             if (isRecording) toggleRecording();
         });
 
-        // 1. Audio Capture from Browser (Compatible with LOCAL and VPS)
+        // 1. Audio Capture from Browser using Native Web Speech API
+        let speechRecognition = null;
+
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Seu navegador não suporta transcrição nativa. Use o Google Chrome ou Edge.");
+                return false;
+            }
+            speechRecognition = new SpeechRecognition();
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = true;
+            speechRecognition.lang = 'pt-BR';
+
+            speechRecognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript + ' ';
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    socket.emit('web_transcription_text', { text: finalTranscript });
+
+                    // Update UI for final text
+                    const placeholder = transcriptionContainer.querySelector('.italic');
+                    if (placeholder) placeholder.remove();
+
+                    const oldInterim = transcriptionContainer.querySelector('.interim-text');
+                    if (oldInterim) oldInterim.remove();
+
+                    const span = document.createElement('span');
+                    span.textContent = finalTranscript;
+                    transcriptionContainer.appendChild(span);
+                    transcriptionContainer.scrollTo(0, transcriptionContainer.scrollHeight);
+
+                    audioLevel.style.width = '100%';
+                    setTimeout(() => audioLevel.style.width = '30%', 100);
+                }
+
+                if (interimTranscript) {
+                    const placeholder = transcriptionContainer.querySelector('.italic');
+                    if (placeholder) placeholder.remove();
+
+                    let interimSpan = transcriptionContainer.querySelector('.interim-text');
+                    if (!interimSpan) {
+                        interimSpan = document.createElement('span');
+                        interimSpan.className = 'interim-text text-slate-400';
+                        transcriptionContainer.appendChild(interimSpan);
+                    }
+                    interimSpan.textContent = interimTranscript;
+
+                    audioLevel.style.width = Math.random() * 80 + 20 + '%';
+                }
+            };
+
+            speechRecognition.onerror = (event) => {
+                console.error("Speech recognition error", event.error);
+            };
+
+            return true;
+        }
+
         async function startBrowserAudio() {
+            if (!speechRecognition) {
+                if (!initSpeechRecognition()) {
+                    toggleRecording();
+                    return;
+                }
+            }
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        channelCount: 1,
-                        sampleRate: 16000
-                    }
-                });
-
-                audioContext = new window.AudioContext({ sampleRate: 16000 });
-                microphone = audioContext.createMediaStreamSource(stream);
-
-                // Script processor (deprecated but widely supported for raw PCM extraction)
-                // In production, an AudioWorklet is better, but this is simpler for the demo
-                pcmProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-
-                pcmProcessor.onaudioprocess = (e) => {
-                    if (!isRecording) return;
-
-                    const channelData = e.inputBuffer.getChannelData(0);
-
-                    // Convert Float32Array to 16bit PCM array for WebSockets
-                    const pcmData = new Int16Array(channelData.length);
-                    let sum = 0;
-
-                    for (let i = 0; i < channelData.length; i++) {
-                        let sample = Math.max(-1, Math.min(1, channelData[i]));
-                        pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-                        sum += channelData[i] * channelData[i];
-                    }
-
-                    // Basic level visualizing locally
-                    const rms = Math.sqrt(sum / channelData.length);
-                    const visualLevel = Math.min(100, rms * 1000);
-                    audioLevel.style.width = `${visualLevel}%`;
-
-                    // Send pure audio chunks to backend
-                    socket.emit('audio_chunk', pcmData.buffer);
-                };
-
-                microphone.connect(pcmProcessor);
-                pcmProcessor.connect(audioContext.destination);
-
                 socket.emit('start_transcribing_from_web', { rate: 16000 });
-
+                speechRecognition.start();
             } catch (err) {
-                console.error('Error accessing microphone:', err);
-                alert('Erro ao acessar o microfone. Permita o uso do microfone no navegador.');
-                toggleRecording(); // fallback
+                console.error('Error starting recognition:', err);
             }
         }
 
         function stopBrowserAudio() {
-            if (pcmProcessor && microphone) {
-                microphone.disconnect();
-                pcmProcessor.disconnect();
-                pcmProcessor.onaudioprocess = null;
-            }
-            if (audioContext) {
-                audioContext.close();
+            if (speechRecognition) {
+                speechRecognition.stop();
             }
             audioLevel.style.width = '0%';
             socket.emit('stop_transcribing_from_web');
+            const oldInterim = transcriptionContainer.querySelector('.interim-text');
+            if (oldInterim) oldInterim.remove();
         }
 
         // Toggle Recording State
@@ -466,6 +504,33 @@
                 }
             } catch (err) {
                 addChatMessage('assistant', 'Erro de conexão.');
+            }
+        });
+
+        // API Key logic
+        const btnApi = document.getElementById('btn-api');
+
+        btnApi.addEventListener('click', async () => {
+            btnApi.innerHTML = '<svg class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Gerando...';
+
+            try {
+                const response = await fetch('/api/generate-key', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    // Show a beautiful prompt dialogue with the key
+                    prompt('🗝️ Nova Chave de Integração IPagent Gerada:\nCopie esta senha para colocar no seu Prontuário Administro e em outros sistemas:', data.api_key);
+                } else {
+                    alert('Erro ao gerar chave.');
+                }
+            } catch (err) {
+                alert('Erro de comunicação. O servidor pode estar reiniciando.');
+            } finally {
+                // Restore button state
+                btnApi.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                </svg> Gerar API Key`;
             }
         });
 

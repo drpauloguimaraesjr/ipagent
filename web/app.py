@@ -58,6 +58,24 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         """Página principal."""
         return render_template('index.html')
 
+    import secrets
+    import os
+    
+    @app.route('/api/generate-key', methods=['POST'])
+    def generate_api_key():
+        """Gera uma nova chave de API para integrações."""
+        new_key = f"sk-IPagent-{secrets.token_hex(8)}"
+        
+        # Salva chave no disco para logs/teste
+        with open("api_keys.txt", "a") as f:
+            f.write(f"{new_key}\n")
+            
+        return jsonify({
+            "success": True, 
+            "message": "Chave de Integração gerada!",
+            "api_key": new_key
+        })
+
     @app.route('/api/status')
     def api_status():
         """Status dos componentes do sistema."""
@@ -255,6 +273,15 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         if transcriber:
             transcriber.stop_session()
         logger.info("⏹️ Streaming de áudio do navegador parado")
+
+    @socketio.on('web_transcription_text')
+    def handle_web_transcription_text(data):
+        """Recebe texto transcrito nativamente pelo navegador Chrome/Safari."""
+        if session_state["is_recording"]:
+            text = data.get('text', '')
+            if text:
+                session_state["current_transcript"] += " " + text
+                logger.info(f"Recebido texto: {text}")
 
     @socketio.on('chat_message')
     def handle_chat_message(data):
