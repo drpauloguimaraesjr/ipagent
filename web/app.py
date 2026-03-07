@@ -67,10 +67,12 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
     from datetime import datetime
     from functools import wraps
 
-    API_KEYS_FILE = "api_keys.json"
+    DATA_DIR = Path("data")
+    DATA_DIR.mkdir(exist_ok=True)
+    API_KEYS_FILE = DATA_DIR / "api_keys.json"
 
     def load_keys():
-        if not os.path.exists(API_KEYS_FILE):
+        if not API_KEYS_FILE.exists():
             return []
         try:
             with open(API_KEYS_FILE, "r") as f:
