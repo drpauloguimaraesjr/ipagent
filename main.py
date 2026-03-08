@@ -2,10 +2,15 @@
 IPagent Ultra-Lite — Ponto de entrada principal.
 Assistente médico com IA local, sem Ollama, sem dependências externas.
 Apenas: pip install → python main.py
+
+💰 Custo de operação: R$ 0,00 — IA 100% local e open source.
 """
 
 import logging
+import os
 import sys
+import threading
+import webbrowser
 
 from config import load_config
 from core.model_manager import ModelManager
@@ -23,9 +28,23 @@ logging.basicConfig(
 logger = logging.getLogger("IPagent")
 
 
+def open_browser(port: int):
+    """
+    Abre o navegador automaticamente após o servidor iniciar.
+    Usa um timer para dar tempo do Flask ficar pronto.
+    """
+    url = f"http://localhost:{port}"
+    try:
+        webbrowser.open(url)
+        logger.info(f"🌐 Navegador aberto em: {url}")
+    except Exception:
+        logger.info(f"🌐 Abra manualmente no navegador: {url}")
+
+
 def main():
     logger.info("🚀 Iniciando IPagent Ultra-Lite...")
     logger.info("   Sem Ollama. IA rodando direto no Python.")
+    logger.info("   💰 Custo: R$ 0,00 — IA 100% local e open source.")
     logger.info("")
 
     # 1. Carregar configurações
@@ -80,11 +99,22 @@ def main():
     logger.info("  ✨ IPagent Ultra-Lite PRONTO!")
     logger.info(f"  🌍 Acesse: http://localhost:{port}")
     logger.info(f"  🔧 Admin:  http://localhost:{port}/admin")
+    logger.info(f"  📚 Base:   http://localhost:{port}/knowledge")
     logger.info(f"  🧠 Modelo: {config.agent.model_name}")
     logger.info(f"  🔍 Correção médica: {'Ativada' if config.correction.enabled else 'Desativada'}")
-    logger.info(f"  💾 Sem Ollama — IA 100% embutida no Python")
+    logger.info(f"  💰 Custo: R$ 0,00 — IA 100% local")
     logger.info("=" * 55)
     logger.info("")
+    logger.info("  Para parar: Ctrl+C")
+    logger.info("  Para reabrir: ./run.sh (Linux/Mac) ou run.bat (Windows)")
+    logger.info("")
+
+    # 8. Abrir navegador automaticamente (se não for reloader do Flask)
+    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+        # Abre o navegador após 1.5s (tempo do Flask iniciar)
+        timer = threading.Timer(1.5, open_browser, args=[port])
+        timer.daemon = True
+        timer.start()
 
     app.run(host=host, port=port, debug=config.web.debug)
 

@@ -3,193 +3,251 @@ chcp 65001 >nul 2>&1
 setlocal EnableDelayedExpansion
 
 :: ============================================================================
-::  IPagent — Instalador Automático (Windows)
-::  Assistente médico com IA local
+::  IPagent — Instalador Automático (Windows CMD)
+::  Assistente médico com IA local — 100%% gratuito, sem consumo de tokens
 ::
-::  Uso: Abra o Prompt de Comando ou PowerShell e execute:
+::  Uso: Abra o Prompt de Comando e execute:
 ::    install.bat
 :: ============================================================================
 
-:: ── Cores ANSI (Windows 10+) ──
-set "GREEN=[32m"
-set "CYAN=[36m"
-set "YELLOW=[33m"
-set "RED=[31m"
-set "BOLD=[1m"
-set "DIM=[2m"
-set "NC=[0m"
-
-:: ── Banner ──
 echo.
-echo   %CYAN%%BOLD%╔══════════════════════════════════════════════════╗%NC%
-echo   %CYAN%%BOLD%║                                                  ║%NC%
-echo   %CYAN%%BOLD%║   IPagent Ultra-Lite — Instalador Windows        ║%NC%
-echo   %CYAN%%BOLD%║   Assistente Medico com IA Local                 ║%NC%
-echo   %CYAN%%BOLD%║                                                  ║%NC%
-echo   %CYAN%%BOLD%╚══════════════════════════════════════════════════╝%NC%
+echo   ╔══════════════════════════════════════════════════╗
+echo   ║                                                  ║
+echo   ║   IPagent Ultra-Lite — Instalador Windows        ║
+echo   ║   Assistente Medico com IA Local                 ║
+echo   ║   100%% gratuito — sem consumo de tokens          ║
+echo   ║                                                  ║
+echo   ╚══════════════════════════════════════════════════╝
 echo.
 
 :: ── Step 1: Verificar Python ──
-echo   %CYAN%%BOLD%[1/6]%NC% %BOLD%Verificando Python...%NC%
+echo   [1/7] Verificando Python...
 
 set "PYTHON_CMD="
+set "USING_EMBEDDED="
 
-:: Tenta python primeiro (Windows geralmente usa "python" não "python3")
+:: Tenta python
 where python >nul 2>&1
 if %errorlevel% equ 0 (
     for /f "tokens=2 delims= " %%v in ('python --version 2^>^&1') do set "PY_VER=%%v"
     set "PYTHON_CMD=python"
-    echo   %GREEN%OK%NC% Python !PY_VER! encontrado
     goto :check_py_version
 )
 
+:: Tenta python3
 where python3 >nul 2>&1
 if %errorlevel% equ 0 (
     for /f "tokens=2 delims= " %%v in ('python3 --version 2^>^&1') do set "PY_VER=%%v"
     set "PYTHON_CMD=python3"
-    echo   %GREEN%OK%NC% Python !PY_VER! encontrado
     goto :check_py_version
 )
 
-:: Python não encontrado — tentar instalar via winget
-echo   %YELLOW%AVISO%NC% Python nao encontrado. Tentando instalar...
+:: Python não encontrado
+goto :install_python
+
+:check_py_version
+for /f "tokens=1,2 delims=." %%a in ("!PY_VER!") do (
+    set "PY_MAJOR=%%a"
+    set "PY_MINOR=%%b"
+)
+if !PY_MAJOR! lss 3 goto :install_python
+if !PY_MAJOR! equ 3 if !PY_MINOR! lss 10 goto :install_python
+echo   OK Python !PY_VER! encontrado
+goto :after_python
+
+:install_python
+echo   Python nao encontrado ou versao antiga. Instalando automaticamente...
+
+:: Tentativa 1: winget
 where winget >nul 2>&1
 if %errorlevel% equ 0 (
-    echo   Instalando Python via winget...
-    winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements -s winget
+    echo   Tentando instalar via winget...
+    winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements -s winget >nul 2>&1
     if %errorlevel% equ 0 (
-        :: Atualizar PATH
         set "PATH=%LOCALAPPDATA%\Programs\Python\Python312;%LOCALAPPDATA%\Programs\Python\Python312\Scripts;%PATH%"
         set "PYTHON_CMD=python"
-        echo   %GREEN%OK%NC% Python instalado com sucesso
+        echo   OK Python instalado via winget
         goto :after_python
     )
 )
 
-:: Fallback: instrucao manual
+:: Tentativa 2: Download direto do instalador Python
+echo   Baixando Python de python.org...
+
+set "PY_URL=https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe"
+set "PY_INSTALLER=%TEMP%\python-installer.exe"
+
+:: Usar PowerShell para download (sempre disponível no Windows 10+)
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%PY_URL%' -OutFile '%PY_INSTALLER%' -UseBasicParsing" 2>nul
+
+if exist "%PY_INSTALLER%" (
+    echo   Instalando Python 3.12 (pode demorar ~1 minuto)...
+    "%PY_INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0 Include_launcher=1
+    if %errorlevel% equ 0 (
+        :: Atualizar PATH
+        for /f "tokens=*" %%p in ('powershell -Command "[Environment]::GetEnvironmentVariable('PATH','User')"') do set "PATH=%%p;%PATH%"
+        set "PYTHON_CMD=python"
+        del "%PY_INSTALLER%" 2>nul
+        echo   OK Python 3.12 instalado com sucesso!
+        goto :after_python
+    )
+    del "%PY_INSTALLER%" 2>nul
+)
+
+:: Tentativa 3: Python embarcado (portable)
+echo   Usando Python portable (sem necessidade de instalacao)...
+
+set "EMBED_URL=https://www.python.org/ftp/python/3.12.8/python-3.12.8-embed-amd64.zip"
+set "EMBED_ZIP=%TEMP%\python-embedded.zip"
+set "EMBED_DIR=%CD%\python"
+
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%EMBED_URL%' -OutFile '%EMBED_ZIP%' -UseBasicParsing" 2>nul
+
+if exist "%EMBED_ZIP%" (
+    echo   Extraindo Python portable...
+    if not exist "%EMBED_DIR%" mkdir "%EMBED_DIR%"
+    powershell -Command "Expand-Archive -Path '%EMBED_ZIP%' -DestinationPath '%EMBED_DIR%' -Force" 2>nul
+    
+    :: Habilitar pip no Python embarcado
+    powershell -Command "$f = Get-ChildItem '%EMBED_DIR%\python*._pth' | Select-Object -First 1; if($f){$c = Get-Content $f.FullName; $c = $c -replace '#import site','import site'; Set-Content $f.FullName $c}" 2>nul
+    
+    :: Instalar pip
+    echo   Instalando pip...
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%EMBED_DIR%\get-pip.py' -UseBasicParsing" 2>nul
+    "%EMBED_DIR%\python.exe" "%EMBED_DIR%\get-pip.py" --no-warn-script-location >nul 2>&1
+    
+    set "PATH=%EMBED_DIR%;%EMBED_DIR%\Scripts;%PATH%"
+    set "PYTHON_CMD=%EMBED_DIR%\python.exe"
+    set "USING_EMBEDDED=1"
+    del "%EMBED_ZIP%" 2>nul
+    echo   OK Python portable pronto em: %EMBED_DIR%
+    goto :after_python
+)
+
+:: Nenhuma tentativa funcionou
 echo.
-echo   %RED%ERRO%NC% Nao foi possivel instalar Python automaticamente.
+echo   ERRO: Nao foi possivel instalar Python automaticamente.
 echo.
 echo   Por favor, instale Python 3.10+ manualmente:
 echo     1. Acesse: https://www.python.org/downloads/
-echo     2. Baixe a versao mais recente do Python 3.12
-echo     3. IMPORTANTE: Marque "Add Python to PATH" durante a instalacao
+echo     2. Baixe Python 3.12
+echo     3. IMPORTANTE: Marque "Add Python to PATH"
 echo     4. Execute este script novamente
 echo.
 pause
 exit /b 1
 
-:check_py_version
-:: Verificar se a versão é >= 3.10
-for /f "tokens=1,2 delims=." %%a in ("!PY_VER!") do (
-    set "PY_MAJOR=%%a"
-    set "PY_MINOR=%%b"
-)
-if !PY_MAJOR! lss 3 (
-    echo   %RED%ERRO%NC% Python !PY_VER! muito antigo. Precisa >= 3.10
-    echo   Instale do site: https://www.python.org/downloads/
-    pause
-    exit /b 1
-)
-if !PY_MAJOR! equ 3 if !PY_MINOR! lss 10 (
-    echo   %RED%ERRO%NC% Python !PY_VER! muito antigo. Precisa >= 3.10
-    echo   Instale do site: https://www.python.org/downloads/
-    pause
-    exit /b 1
-)
-
 :after_python
 
 :: ── Step 2: Verificar código-fonte ──
 echo.
-echo   %CYAN%%BOLD%[2/6]%NC% %BOLD%Verificando codigo-fonte...%NC%
+echo   [2/7] Verificando codigo-fonte...
 
 if exist "main.py" if exist "config.py" if exist "core" (
-    echo   %GREEN%OK%NC% Codigo-fonte encontrado no diretorio atual
+    echo   OK Codigo-fonte encontrado
     goto :setup_venv
 )
 
 :: Verificar git e clonar
 where git >nul 2>&1
 if %errorlevel% neq 0 (
-    echo   %YELLOW%AVISO%NC% Git nao encontrado. Tentando instalar...
+    echo   Git nao encontrado. Tentando instalar...
     where winget >nul 2>&1
     if %errorlevel% equ 0 (
-        winget install Git.Git --accept-package-agreements --accept-source-agreements -s winget
+        winget install Git.Git --accept-package-agreements --accept-source-agreements -s winget >nul 2>&1
         set "PATH=%ProgramFiles%\Git\cmd;%PATH%"
     ) else (
-        echo   %RED%ERRO%NC% Instale Git manualmente: https://git-scm.com/download/win
-        pause
-        exit /b 1
+        :: Download Git portable
+        echo   Baixando Git portable...
+        set "GIT_URL=https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/MinGit-2.47.1.2-64-bit.zip"
+        set "GIT_ZIP=%TEMP%\git-portable.zip"
+        set "GIT_DIR=%CD%\git"
+        powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '!GIT_URL!' -OutFile '!GIT_ZIP!' -UseBasicParsing" 2>nul
+        if exist "!GIT_ZIP!" (
+            if not exist "!GIT_DIR!" mkdir "!GIT_DIR!"
+            powershell -Command "Expand-Archive -Path '!GIT_ZIP!' -DestinationPath '!GIT_DIR!' -Force" 2>nul
+            set "PATH=!GIT_DIR!\cmd;%PATH%"
+            del "!GIT_ZIP!" 2>nul
+        ) else (
+            echo   ERRO: Instale Git manualmente: https://git-scm.com/download/win
+            pause
+            exit /b 1
+        )
     )
 )
 
 echo   Clonando repositorio...
 git clone https://github.com/drpauloguimaraesjr/IPagent.git
 cd IPagent
-echo   %GREEN%OK%NC% Repositorio clonado
+echo   OK Repositorio clonado
 
 :setup_venv
 :: ── Step 3: Criar ambiente virtual ──
 echo.
-echo   %CYAN%%BOLD%[3/6]%NC% %BOLD%Criando ambiente virtual Python...%NC%
+echo   [3/7] Criando ambiente virtual Python...
+
+if defined USING_EMBEDDED (
+    echo   Usando Python portable ^(sem venv^)
+    goto :install_deps
+)
 
 if exist "venv" (
     echo   Ambiente virtual existente encontrado
 ) else (
     !PYTHON_CMD! -m venv venv
-    echo   %GREEN%OK%NC% Ambiente virtual criado
+    echo   OK Ambiente virtual criado
 )
-
-:: Ativar venv
 call venv\Scripts\activate.bat
 
+:install_deps
 :: ── Step 4: Instalar dependências ──
 echo.
-echo   %CYAN%%BOLD%[4/6]%NC% %BOLD%Instalando dependencias...%NC%
+echo   [4/7] Instalando dependencias...
 
-pip install --upgrade pip -q 2>nul
-pip install -r requirements.txt -q
-echo   %GREEN%OK%NC% Todas as dependencias instaladas
+if defined USING_EMBEDDED (
+    "!PYTHON_CMD!" -m pip install --upgrade pip -q 2>nul
+    "!PYTHON_CMD!" -m pip install -r requirements.txt -q
+) else (
+    pip install --upgrade pip -q 2>nul
+    pip install -r requirements.txt -q
+)
+echo   OK Todas as dependencias instaladas
 
 :: ── Step 5: Verificar GPU ──
 echo.
-echo   %CYAN%%BOLD%[5/6]%NC% %BOLD%Detectando aceleracao por hardware...%NC%
+echo   [5/7] Detectando aceleracao por hardware...
 
 set "GPU_MODE=cpu"
 
-:: Verificar NVIDIA GPU
 where nvidia-smi >nul 2>&1
 if %errorlevel% equ 0 (
     nvidia-smi >nul 2>&1
     if %errorlevel% equ 0 (
         for /f "tokens=*" %%g in ('nvidia-smi --query-gpu^=name --format^=csv^,noheader 2^>nul') do (
-            echo   %GREEN%OK%NC% GPU NVIDIA detectada: %%g
+            echo   OK GPU NVIDIA detectada: %%g
         )
         set "GPU_MODE=nvidia"
         echo   Reinstalando llama-cpp-python com suporte CUDA...
-        pip install llama-cpp-python --force-reinstall --no-cache-dir -C cmake.args="-DGGML_CUDA=on" -q 2>nul
+        if defined USING_EMBEDDED (
+            "!PYTHON_CMD!" -m pip install llama-cpp-python --force-reinstall --no-cache-dir -C cmake.args="-DGGML_CUDA=on" -q 2>nul
+        ) else (
+            pip install llama-cpp-python --force-reinstall --no-cache-dir -C cmake.args="-DGGML_CUDA=on" -q 2>nul
+        )
         if %errorlevel% neq 0 (
-            echo   %YELLOW%AVISO%NC% Nao foi possivel compilar com CUDA. Usando modo CPU.
+            echo   AVISO: Nao foi possivel compilar com CUDA. Usando CPU.
             set "GPU_MODE=cpu"
         )
-    ) else (
-        echo   %YELLOW%AVISO%NC% GPU NVIDIA detectada, mas driver nao esta ativo
-        echo   Para usar GPU: atualize o driver em https://www.nvidia.com/drivers/
     )
 ) else (
-    echo   Modo: %BOLD%CPU%NC% ^(funcional, mas mais lento^)
-    echo   Dica: Com GPU NVIDIA, as respostas sao ~10x mais rapidas
+    echo   Modo: CPU ^(funcional, mas mais lento^)
 )
 
-:: Salvar configuração GPU
 echo %GPU_MODE%> .gpu_mode
 
 :: ── Step 6: Criar scripts de execução ──
 echo.
-echo   %CYAN%%BOLD%[6/6]%NC% %BOLD%Criando scripts de execucao...%NC%
+echo   [6/7] Criando scripts de execucao...
 
-:: Criar diretórios de dados
 if not exist "data\models" mkdir data\models
 if not exist "data\knowledge" mkdir data\knowledge
 if not exist "data\consultations" mkdir data\consultations
@@ -201,7 +259,13 @@ if not exist "data\uploads" mkdir data\uploads
 echo @echo off
 echo chcp 65001 ^>nul 2^>^&1
 echo cd /d "%%~dp0"
-echo call venv\Scripts\activate.bat
+echo.
+echo :: Detectar Python ^(venv ou portable^)
+echo if exist "venv\Scripts\activate.bat" ^(
+echo     call venv\Scripts\activate.bat
+echo ^) else if exist "python\python.exe" ^(
+echo     set "PATH=%%~dp0python;%%~dp0python\Scripts;%%PATH%%"
+echo ^)
 echo.
 echo set "GPU_LAYERS=-1"
 echo if exist .gpu_mode ^(
@@ -212,34 +276,48 @@ echo.
 echo set IPAGENT_GPU_LAYERS=%%GPU_LAYERS%%
 echo echo.
 echo echo   IPagent - Iniciando...
-echo echo   Modo GPU: %%GPU_LAYERS%%
+echo echo   Custo: R$ 0,00 ^(IA 100%%%% local^)
 echo echo.
 echo python main.py
 echo pause
 ) > run.bat
 
-echo   %GREEN%OK%NC% Script de execucao criado: %BOLD%run.bat%NC%
+echo   OK Script criado: run.bat
+
+:: ── Step 7: Verificar instalação ──
+echo.
+echo   [7/7] Verificando instalacao...
+
+if defined USING_EMBEDDED (
+    "!PYTHON_CMD!" -c "from llama_cpp import Llama; import flask; import fitz; print('OK')" 2>nul
+) else (
+    python -c "from llama_cpp import Llama; import flask; import fitz; print('OK')" 2>nul
+)
+if %errorlevel% equ 0 (
+    echo   OK Todos os componentes verificados!
+) else (
+    echo   AVISO: Alguns componentes podem ter problemas.
+)
 
 :: ── Finalização ──
 echo.
-echo   %GREEN%%BOLD%╔══════════════════════════════════════════════════╗%NC%
-echo   %GREEN%%BOLD%║                                                  ║%NC%
-echo   %GREEN%%BOLD%║   Instalacao concluida com sucesso!               ║%NC%
-echo   %GREEN%%BOLD%║                                                  ║%NC%
-echo   %GREEN%%BOLD%╚══════════════════════════════════════════════════╝%NC%
+echo   ╔══════════════════════════════════════════════════╗
+echo   ║                                                  ║
+echo   ║   Instalacao concluida com sucesso!               ║
+echo   ║                                                  ║
+echo   ║   Custo: R$ 0,00 — IA 100%% local               ║
+echo   ║   Seus dados nunca saem do computador            ║
+echo   ║                                                  ║
+echo   ╚══════════════════════════════════════════════════╝
 echo.
-echo   %BOLD%Para iniciar o IPagent:%NC%
+echo   Para iniciar o IPagent:
 echo.
-echo     %CYAN%run.bat%NC%
+echo     run.bat
 echo.
-echo   %DIM%Ou manualmente:%NC%
-echo     %DIM%venv\Scripts\activate.bat%NC%
-echo     %DIM%python main.py%NC%
-echo.
-echo   %BOLD%Acesse:%NC% %CYAN%http://localhost:5000%NC%
+echo   Acesse: http://localhost:5000
 echo.
 echo   Na primeira execucao, o modelo de IA ^(~2 GB^) sera
-echo   baixado automaticamente. Depois disso, inicia em segundos.
+echo   baixado automaticamente.
 echo.
 
 set /p START="  Deseja iniciar o IPagent agora? [S/n] "
