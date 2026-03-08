@@ -125,6 +125,11 @@ class WebConfig:
     debug: bool = True
     secret_key: str = "ipagent-secret-key-change-me"
 
+    # HTTPS (necessário para microfone remoto via iPhone/Android)
+    https_enabled: bool = False
+    ssl_cert: str = str(DATA_DIR / "ssl" / "cert.pem")
+    ssl_key: str = str(DATA_DIR / "ssl" / "key.pem")
+
 
 @dataclass
 class AppConfig:
@@ -157,8 +162,12 @@ def load_config() -> AppConfig:
     if os.environ.get("IPAGENT_CORRECTION_ENABLED"):
         config.correction.enabled = os.environ["IPAGENT_CORRECTION_ENABLED"].lower() == "true"
 
+    if os.environ.get("IPAGENT_HTTPS"):
+        config.web.https_enabled = os.environ["IPAGENT_HTTPS"].lower() == "true"
+
     # Criar diretórios necessários
-    for dir_path in [DATA_DIR, MODELS_DIR, CONSULTATIONS_DIR, KNOWLEDGE_DIR, TRAINING_DIR]:
+    SSL_DIR = DATA_DIR / "ssl"
+    for dir_path in [DATA_DIR, MODELS_DIR, CONSULTATIONS_DIR, KNOWLEDGE_DIR, TRAINING_DIR, SSL_DIR]:
         dir_path.mkdir(parents=True, exist_ok=True)
 
     return config

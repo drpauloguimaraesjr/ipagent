@@ -18,7 +18,12 @@ data/knowledge/
 data/consultations/
 data/training_datasets/
 data/uploads/
+data/ssl/
 data/api_keys.json
+
+# Portable (Windows installer downloads)
+python/
+git/
 
 # IDE
 .vscode/
