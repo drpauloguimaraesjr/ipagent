@@ -544,10 +544,10 @@
                 API Key
             </button>
 
-            <button id="btn-knowledge" class="btn">
+            <a href="/knowledge" class="btn">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
                 Base de Conhecimento
-            </button>
+            </a>
 
             <div class="status-badge">
                 <div class="status-dot" id="connection-dot"></div>
@@ -559,11 +559,7 @@
                 <span>Corrigindo termos médicos...</span>
             </div>
 
-            <select id="lang-select" class="btn" style="padding:7px 12px; font-size:12px; cursor:pointer; background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border); border-radius:var(--radius-full); font-family:inherit; appearance:none; -webkit-appearance:none; text-align:center; min-width:70px;">
-                <option value="pt-BR">🇧🇷 PT-BR</option>
-                <option value="en-US">🇺🇸 EN-US</option>
-                <option value="es-ES">🇪🇸 ES</option>
-            </select>
+            <span class="status-badge" style="font-size:12px;">🇧🇷 Português</span>
 
             <button id="btn-record" class="btn btn-primary">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg>
@@ -748,7 +744,7 @@
             speechRecognition = new SR();
             speechRecognition.continuous = true;
             speechRecognition.interimResults = true;
-            speechRecognition.lang = document.getElementById('lang-select').value;
+            speechRecognition.lang = 'pt-BR'; // Fixo em pt-BR. Termos em inglês são corrigidos pela IA.
 
             speechRecognition.onresult = (event) => {
                 let interimTranscript = '';

@@ -116,19 +116,27 @@ class MedicalAgent:
 
         # Camada 2: Correção por LLM
         try:
-            correction_prompt = (
-                "Corrija a transcrição médica abaixo. Regras:\n"
-                "1. Corrija termos médicos transcritos errados\n"
-                "2. Formate medicamentos e dosagens\n"
-                "3. Mantenha expressões populares entre aspas\n"
-                "4. NÃO mude o sentido\n"
-                "5. Responda APENAS com o texto corrigido\n\n"
-                f'Transcrição: "{quick_fixed}"\n\nCorrigida:'
-            )
-
             response = self._llm.create_chat_completion(
-                messages=[{"role": "user", "content": correction_prompt}],
-                max_tokens=len(quick_fixed) * 2,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Você é um corretor ortográfico médico. "
+                            "Sua ÚNICA função é receber um texto e devolver o texto corrigido. "
+                            "REGRAS ABSOLUTAS:\n"
+                            "- Corrija APENAS erros de ortografia e termos médicos errados\n"
+                            "- Se o texto não tiver erros, repita-o exatamente igual\n"
+                            "- NUNCA explique, comente ou recuse. APENAS devolva o texto\n"
+                            "- Mantenha o idioma original (português)\n"
+                            "- Formate nomes de medicamentos corretamente"
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Corrija: {quick_fixed}"
+                    }
+                ],
+                max_tokens=max(len(quick_fixed) * 2, 200),
                 temperature=0.1,
             )
 
@@ -137,6 +145,10 @@ class MedicalAgent:
             # Remove aspas extras
             if corrected.startswith('"') and corrected.endswith('"'):
                 corrected = corrected[1:-1]
+            
+            # Se o modelo adicionou explicação, descartar (pegar só a 1ª linha)
+            if len(corrected) > len(quick_fixed) * 3:
+                corrected = quick_fixed
 
             # Identifica termos médicos
             terms_prompt = (

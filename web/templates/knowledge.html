@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base de Conhecimento — IPagent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d27;
+            --bg-card: #1e2130;
+            --bg-card-hover: #252839;
+            --bg-input: #14161f;
+            --border: #2a2d3a;
+            --border-light: #353849;
+            --text-primary: #e8eaed;
+            --text-secondary: #9ba1b0;
+            --text-muted: #6b7280;
+            --accent-blue: #3b82f6;
+            --accent-blue-hover: #2563eb;
+            --accent-blue-glow: rgba(59, 130, 246, 0.15);
+            --accent-indigo: #6366f1;
+            --accent-teal: #14b8a6;
+            --accent-teal-glow: rgba(20, 184, 166, 0.15);
+            --accent-amber: #f59e0b;
+            --accent-green: #22c55e;
+            --accent-green-glow: rgba(34, 197, 94, 0.2);
+            --radius: 14px;
+            --radius-sm: 10px;
+            --radius-full: 100px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.3);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-group { display: flex; align-items: center; gap: 12px; }
+
+        .logo-icon {
+            width: 40px; height: 40px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-indigo));
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 16px;
+        }
+
+        .logo-text h1 { font-size: 18px; font-weight: 700; }
+        .logo-text p { font-size: 11px; color: var(--text-muted); }
+
+        .header-actions { display: flex; align-items: center; gap: 10px; }
+
+        .btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 18px; border-radius: var(--radius-full);
+            font-size: 13px; font-weight: 500;
+            border: 1px solid var(--border); background: var(--bg-card);
+            color: var(--text-secondary); cursor: pointer;
+            transition: var(--transition); font-family: inherit;
+            text-decoration: none;
+        }
+
+        .btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+        .btn-primary {
+            background: var(--accent-blue); color: white;
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary:hover { background: var(--accent-blue-hover); }
+
+        /* Main */
+        main {
+            flex: 1; display: flex; overflow: hidden;
+            padding: 16px; gap: 16px;
+        }
+
+        .panel {
+            background: var(--bg-card); border-radius: var(--radius);
+            border: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow: hidden;
+            flex: 1;
+        }
+
+        .panel-header {
+            padding: 14px 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-secondary);
+        }
+
+        .panel-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+        .panel-count {
+            font-size: 11px; background: var(--accent-blue-glow); color: var(--accent-blue);
+            padding: 2px 10px; border-radius: var(--radius-full); font-weight: 600;
+        }
+
+        .panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+
+        .panel-body::-webkit-scrollbar { width: 4px; }
+        .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* Items */
+        .item {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 16px; margin-bottom: 12px;
+            cursor: pointer; transition: var(--transition);
+        }
+
+        .item:hover { border-color: var(--border-light); transform: translateY(-1px); }
+
+        .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+
+        .item-title { font-size: 14px; font-weight: 600; }
+
+        .item-date { font-size: 11px; color: var(--text-muted); }
+
+        .item-preview {
+            font-size: 12px; color: var(--text-secondary); line-height: 1.6;
+            max-height: 60px; overflow: hidden;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+        }
+
+        .item-tags { display: flex; gap: 6px; margin-top: 8px; }
+
+        .tag {
+            font-size: 10px; padding: 2px 8px; border-radius: 6px;
+            font-weight: 600; letter-spacing: 0.3px;
+        }
+
+        .tag-consultation { background: var(--accent-blue-glow); color: var(--accent-blue); }
+        .tag-article { background: var(--accent-teal-glow); color: var(--accent-teal); }
+        .tag-processed { background: var(--accent-green-glow); color: var(--accent-green); }
+
+        /* Upload area */
+        .upload-area {
+            border: 2px dashed var(--border); border-radius: var(--radius-sm);
+            padding: 24px; text-align: center; cursor: pointer;
+            transition: var(--transition); margin-bottom: 16px;
+        }
+
+        .upload-area:hover { border-color: var(--accent-blue); background: var(--accent-blue-glow); }
+        .upload-area p { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+        .upload-area .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center; padding: 40px 20px; color: var(--text-muted);
+        }
+
+        .empty-state svg { opacity: 0.15; margin-bottom: 12px; }
+        .empty-state p { font-size: 13px; }
+
+        /* Detail modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px); z-index: 50;
+            display: none; align-items: center; justify-content: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--bg-card); border-radius: var(--radius);
+            border: 1px solid var(--border); width: 700px; max-width: 90vw;
+            max-height: 80vh; display: flex; flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 18px 22px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .modal-header h3 { font-size: 16px; font-weight: 600; }
+
+        .modal-close {
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; padding: 4px;
+        }
+
+        .modal-close:hover { color: var(--text-primary); }
+
+        .modal-body {
+            padding: 22px; flex: 1; overflow-y: auto;
+            font-size: 14px; line-height: 1.8; color: var(--text-secondary);
+        }
+
+        /* Processing indicator */
+        .processing {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; color: var(--accent-amber);
+            padding: 8px 14px; background: rgba(245, 158, 11, 0.1);
+            border-radius: 8px; margin-bottom: 12px;
+        }
+
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white; border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        .spinner.amber { border-color: rgba(245, 158, 11, 0.3); border-top-color: var(--accent-amber); }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Stats bar */
+        .stats-bar {
+            padding: 10px 20px; border-top: 1px solid var(--border);
+            display: flex; gap: 20px; font-size: 11px; color: var(--text-muted);
+            background: var(--bg-secondary);
+        }
+
+        .stat { display: flex; align-items: center; gap: 4px; }
+        .stat-value { color: var(--text-primary); font-weight: 600; }
+
+        @media (max-width: 900px) {
+            main { flex-direction: column; }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="logo-group">
+            <div class="logo-icon">📚</div>
+            <div class="logo-text">
+                <h1>Base de Conhecimento</h1>
+                <p>Consultas anteriores & Literatura científica</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <a href="/" class="btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                Voltar ao IPagent
+            </a>
+        </div>
+    </header>
+
+    <main>
+        <!-- LEFT: Consultas Anteriores -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    Minhas Consultas
+                </div>
+                <span id="consult-count" class="panel-count">0</span>
+            </div>
+
+            <div id="consultations-list" class="panel-body">
+                <div class="empty-state">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <p>Nenhuma consulta salva ainda.</p>
+                    <p style="font-size:11px; margin-top:4px;">Salve consultas na tela principal para vê-las aqui.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Artigos Científicos -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                    Artigos Científicos
+                </div>
+                <span id="articles-count" class="panel-count">0</span>
+            </div>
+
+            <div id="articles-list" class="panel-body">
+                <!-- Upload area -->
+                <div class="upload-area" id="upload-zone" onclick="document.getElementById('pdf-input').click()">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto;display:block;color:var(--accent-blue);opacity:0.5;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <p>Clique para enviar PDF científico</p>
+                    <p class="hint">A IA extrai o conteúdo (com OCR se necessário) e indexa na base</p>
+                    <input type="file" id="pdf-input" accept="application/pdf" style="display:none" multiple>
+                </div>
+
+                <div id="processing-indicator" class="processing" style="display:none;">
+                    <div class="spinner amber"></div>
+                    <span id="processing-text">Processando PDF com OCR...</span>
+                </div>
+
+                <div id="articles-empty" class="empty-state">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                    <p>Nenhum artigo indexado.</p>
+                    <p style="font-size:11px; margin-top:4px;">Envie PDFs de artigos e diretrizes clínicas.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Detail modal -->
+    <div id="detail-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">Detalhes</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div id="modal-content" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        // Load data on page open
+        loadKnowledgeBase();
+
+        async function loadKnowledgeBase() {
+            try {
+                const res = await fetch('/api/knowledge/list');
+                const data = await res.json();
+
+                renderConsultations(data.consultations || []);
+                renderArticles(data.articles || []);
+            } catch (err) {
+                console.error('Erro ao carregar base:', err);
+            }
+        }
+
+        function renderConsultations(items) {
+            const container = document.getElementById('consultations-list');
+            document.getElementById('consult-count').textContent = items.length;
+
+            if (items.length === 0) return;
+
+            container.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.onclick = () => showDetail(item.content, item.date || 'Consulta');
+                div.innerHTML = `
+                    <div class="item-header">
+                        <span class="item-title">${item.diagnosis || 'Consulta'}</span>
+                        <span class="item-date">${item.date || ''}</span>
+                    </div>
+                    <div class="item-preview">${item.content.substring(0, 200)}...</div>
+                    <div class="item-tags">
+                        <span class="tag tag-consultation">Consulta</span>
+                        ${item.patient_id ? `<span class="tag tag-processed">Paciente: ${item.patient_id}</span>` : ''}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderArticles(items) {
+            const container = document.getElementById('articles-list');
+            const emptyEl = document.getElementById('articles-empty');
+            document.getElementById('articles-count').textContent = items.length;
+
+            if (items.length === 0) return;
+
+            emptyEl.style.display = 'none';
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.onclick = () => showDetail(item.content, item.filename || 'Artigo');
+                div.innerHTML = `
+                    <div class="item-header">
+                        <span class="item-title">📄 ${item.filename || 'Artigo'}</span>
+                        <span class="item-date">${item.category || 'article'}</span>
+                    </div>
+                    <div class="item-preview">${item.content.substring(0, 200)}...</div>
+                    <div class="item-tags">
+                        <span class="tag tag-article">Literatura</span>
+                        <span class="tag tag-processed">✓ Indexado</span>
+                    </div>
+                `;
+                container.insertBefore(div, emptyEl);
+            });
+        }
+
+        // PDF Upload
+        document.getElementById('pdf-input').addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (!files.length) return;
+
+            const indicator = document.getElementById('processing-indicator');
+            const processText = document.getElementById('processing-text');
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!file.name.toLowerCase().endsWith('.pdf')) continue;
+
+                indicator.style.display = 'flex';
+                processText.textContent = `Processando: ${file.name} (${i+1}/${files.length})...`;
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const res = await fetch('/api/upload-pdf', { method: 'POST', body: formData });
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        processText.textContent = `✅ ${file.name} indexado!`;
+                    } else {
+                        processText.textContent = `❌ ${file.name}: ${data.error}`;
+                    }
+                } catch {
+                    processText.textContent = `❌ Erro ao processar ${file.name}`;
+                }
+            }
+
+            setTimeout(() => {
+                indicator.style.display = 'none';
+                loadKnowledgeBase(); // Reload
+            }, 2000);
+
+            e.target.value = '';
+        });
+
+        // Detail modal
+        function showDetail(content, title) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-content').innerHTML = content.replace(/\n/g, '<br>');
+            document.getElementById('detail-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.remove('active');
+        }
+
+        document.getElementById('detail-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) closeModal();
+        });
+    </script>
+</body>
+</html>

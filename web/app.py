@@ -428,4 +428,58 @@ def create_app(config, agent=None, memory=None, data_collector=None):
     def generate_key_legacy():
         return create_api_key()
 
+    # ==========================================
+    # Base de Conhecimento
+    # ==========================================
+
+    @app.route('/knowledge')
+    def knowledge_page():
+        """Página de Base de Conhecimento."""
+        return render_template('knowledge.html')
+
+    @app.route('/api/knowledge/list')
+    def list_knowledge():
+        """Lista consultas e artigos da base de conhecimento."""
+        consultations = []
+        articles = []
+
+        if memory and memory.is_initialized:
+            try:
+                import sqlite3
+                conn = sqlite3.connect(memory.db_path)
+                cursor = conn.cursor()
+
+                # Consultas
+                cursor.execute(
+                    "SELECT content, category, source FROM documents WHERE category = 'consultation' ORDER BY rowid DESC LIMIT 50"
+                )
+                for row in cursor.fetchall():
+                    content_text = row[0]
+                    consultations.append({
+                        "content": content_text,
+                        "diagnosis": content_text[:60] + "..." if len(content_text) > 60 else content_text,
+                        "date": row[2] if row[2] else "",
+                    })
+
+                # Artigos/Literatura
+                cursor.execute(
+                    "SELECT content, category, source FROM documents WHERE category != 'consultation' ORDER BY rowid DESC LIMIT 50"
+                )
+                for row in cursor.fetchall():
+                    content_text = row[0]
+                    articles.append({
+                        "content": content_text,
+                        "filename": row[2] if row[2] else "Artigo",
+                        "category": row[1],
+                    })
+
+                conn.close()
+            except Exception as e:
+                logger.error(f"Erro ao listar knowledge: {e}")
+
+        return jsonify({
+            "consultations": consultations,
+            "articles": articles
+        })
+
     return app

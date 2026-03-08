@@ -35,5 +35,11 @@ Thumbs.db
 .env
 .env.local
 
+# Installer generated (machine-specific)
+.gpu_mode
+run.sh
+run.bat
+run.ps1
+
 # Test repos (não subir)
 test_repos/
