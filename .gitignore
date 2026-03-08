@@ -1,19 +1,39 @@
-# Diretórios Python Padrão
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Virtual Environment
 venv/
-.env
+.venv/
+env/
 
-# Diretórios de Dados que NUNCA vão pro GitHub
-# Contêm os seus PDFs e Transcrições (Sigilo Médico)
-data/
-*.db
+# Dados (não subir para o git)
+data/models/*.gguf
+data/knowledge/
+data/consultations/
+data/training_datasets/
+data/uploads/
+data/api_keys.json
 
-# Modelos do Whisper e Ollama pesados que não vão pro Github
-models/
-*.gguf
-*.bin
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Outros
+# OS
 .DS_Store
-*.log
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Test repos (não subir)
+test_repos/

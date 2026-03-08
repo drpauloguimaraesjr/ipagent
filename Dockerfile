@@ -1,30 +1,33 @@
-FROM python:3.10-slim
-
-# Instalar dependências de sistema
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    ffmpeg \
-    alsa-utils \
-    portaudio19-dev \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Instalar dependências Python primeiro (aproveita o cache do Docker)
+# Dependências mínimas do sistema para llama-cpp-python
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copiar e instalar dependências Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código do IPagent
+# Copiar código
 COPY . .
 
-# Expor porta da Web Interface
+# Criar diretórios de dados
+RUN mkdir -p data/models data/knowledge data/consultations data/training_datasets data/uploads
+
+# O modelo será baixado automaticamente na primeira execução
+# Ou monte um volume com o modelo pré-baixado:
+# docker run -v /caminho/modelo:/app/data/models ipagent
+
 EXPOSE 5000
 
-# Variáveis de ambiente
-ENV IPAGENT_PORT=5000
-ENV IPAGENT_OLLAMA_HOST="http://ollama:11434"
+# Variáveis de ambiente opcionais
+ENV IPAGENT_MODEL=qwen2.5-3b
+ENV IPAGENT_GPU_LAYERS=0
 
-# Comando para rodar a aplicação
 CMD ["python", "main.py"]

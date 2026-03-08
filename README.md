@@ -1,118 +1,104 @@
-# 🤖 IPagent — Assistente IA Local para Consultas Médicas
+# 🧠 IPagent Ultra-Lite
 
-## Visão Geral
+**Assistente médico com IA local — sem Ollama, sem dependências externas.**
 
-IPagent é um assistente de inteligência artificial que roda **100% localmente** no seu computador, projetado para auxiliar profissionais de saúde durante consultas médicas. Ele transcreve conversas em tempo real e fornece insights inteligentes.
+Apenas `pip install` e `python main.py`. O modelo de IA baixa automaticamente na primeira execução.
 
-## 🏗️ Arquitetura
+## ✨ Funcionalidades
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Interface Web (Flask)                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │  Transcrição  │  │  Chat IA     │  │  Histórico    │  │
-│  │  em Tempo Real│  │  Assistente  │  │  Consultas    │  │
-│  └──────┬───────┘  └──────┬───────┘  └───────┬───────┘  │
-│         │                 │                   │          │
-├─────────┼─────────────────┼───────────────────┼──────────┤
-│         ▼                 ▼                   ▼          │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │faster-whisper│  │  Ollama LLM  │  │   ChromaDB    │  │
-│  │  (STT Local) │  │ (Llama/Qwen) │  │    (RAG)      │  │
-│  └──────────────┘  └──────────────┘  └───────────────┘  │
-│                                                          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │        Pipeline de Fine-Tuning (unsloth+QLoRA)    │   │
-│  │  Consultas → Feedback → Treinamento → Modelo ↻   │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
+| Funcionalidade | Descrição |
+|---|---|
+| 🎙️ **Transcrição ao Vivo** | Web Speech API (navegador) com correção médica pela IA |
+| 🧠 **Correção Médica** | 2 camadas: dicionário rápido + LLM para termos técnicos |
+| 💬 **Chat Clínico** | Converse com a IA sobre a consulta em andamento |
+| 📊 **Análise Diagnóstica** | IA analisa transcrição e sugere plano baseado em evidências |
+| 📝 **Nota SOAP** | Gera notas no formato SOAP automaticamente |
+| 📚 **Base de Conhecimento** | Upload de PDFs científicos para embasamento (RAG) |
+| 🗝️ **API Keys** | Integração com sistemas externos via API |
+| 📦 **Coleta para Fine-tuning** | Acumula correções para treinamento futuro |
 
-## 🛠️ Stack Tecnológica
-
-| Componente | Tecnologia | Função |
-|---|---|---|
-| Transcrição | `faster-whisper` | Fala → Texto em tempo real |
-| LLM Local | `Ollama` (Qwen 2.5 / Llama 3.2) | Cérebro do agente |
-| Fine-Tuning | `unsloth` + QLoRA | Aprendizado progressivo |
-| Base de Conhecimento | `ChromaDB` | Memória persistente (RAG) |
-| Interface | `Flask` + WebSocket | UI para consultas |
-| Áudio | `sounddevice` + `webrtcvad` | Captura de microfone |
-
-## 📋 Requisitos de Hardware
-
-- **GPU**: NVIDIA RTX 4060 8GB (ou superior)
-- **RAM**: 16GB+ recomendado
-- **Armazenamento**: 20GB+ para modelos
-- **Microfone**: Qualquer microfone USB/integrado
-
-## 🚀 Instalação
+## 🚀 Instalação (3 passos)
 
 ```bash
-# 1. Criar ambiente virtual
-python3 -m venv venv
-source venv/bin/activate
+# 1. Clonar o projeto
+git clone https://github.com/seu-usuario/IPagent.git
+cd IPagent
 
 # 2. Instalar dependências
 pip install -r requirements.txt
 
-# 3. Instalar Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# 4. Baixar modelo LLM
-ollama pull qwen2.5:7b-instruct-q4_K_M
-
-# 5. Baixar modelo de transcrição (automático no primeiro uso)
-# O faster-whisper baixa o modelo automaticamente
-
-# 6. Iniciar o IPagent
+# 3. Rodar!
 python main.py
+# Na 1ª vez, o modelo de IA (~2 GB) será baixado automaticamente.
+# Depois disso, inicia em segundos.
 ```
 
-## 📁 Estrutura do Projeto
+Acesse: **http://localhost:5000**
+
+**Não precisa instalar Ollama nem nenhum outro programa.**
+
+## 📦 Requisitos
+
+### Mínimos
+- **Python 3.10+**
+- **4 GB de RAM** (modelo 3B na CPU)
+- **~3 GB de disco** (código + modelo)
+
+### Recomendados
+- **8 GB de RAM**
+- **GPU NVIDIA com 4+ GB VRAM** (muito mais rápido)
+- **~3 GB de disco**
+
+## 🧠 Modelos Disponíveis
+
+| Modelo | Tamanho | RAM/VRAM | Qualidade |
+|---|---|---|---|
+| **`qwen2.5-3b`** (padrão) | 1.9 GB | ~3 GB | Boa |
+| `qwen2.5-7b` | 4.7 GB | ~5 GB | Muito boa |
+| `llama3.2-3b` | 2.0 GB | ~3 GB | Boa |
+
+Para trocar o modelo:
+```bash
+IPAGENT_MODEL=qwen2.5-7b python main.py
+```
+
+## ⚙️ Variáveis de Ambiente
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `IPAGENT_MODEL` | `qwen2.5-3b` | Modelo de IA |
+| `IPAGENT_GPU_LAYERS` | `-1` (auto) | `-1` = toda GPU, `0` = só CPU |
+| `IPAGENT_PORT` | `5000` | Porta do servidor |
+| `IPAGENT_CORRECTION_ENABLED` | `true` | Correção médica ativa |
+
+## 📁 Estrutura
 
 ```
 IPagent/
-├── main.py                 # Ponto de entrada principal
-├── requirements.txt        # Dependências Python
-├── config.py               # Configurações do sistema
+├── main.py                  # Ponto de entrada
+├── config.py                # Configurações
+├── requirements.txt         # 7 dependências
 ├── core/
-│   ├── __init__.py
-│   ├── transcriber.py      # Motor de transcrição (faster-whisper)
-│   ├── agent.py            # Agente LLM (Ollama)
-│   ├── memory.py           # Base de conhecimento (ChromaDB/RAG)
-│   └── audio.py            # Captura de áudio em tempo real
+│   ├── agent.py             # LLM + RAG + Correção Médica
+│   ├── memory.py            # SQLite FTS5 (base de conhecimento)
+│   └── model_manager.py     # Download e carregamento do modelo
 ├── training/
-│   ├── __init__.py
-│   ├── data_collector.py   # Coleta dados para fine-tuning
-│   ├── fine_tuner.py       # Pipeline de fine-tuning (unsloth)
-│   └── datasets/           # Dados de treinamento
-├── web/
-│   ├── __init__.py
-│   ├── app.py              # Servidor Flask
-│   ├── templates/
-│   │   └── index.html      # Interface principal
-│   └── static/
-│       ├── css/
-│       │   └── style.css
-│       └── js/
-│           └── app.js
-└── data/
-    ├── consultations/      # Transcrições salvas
-    ├── models/             # Modelos fine-tuned
-    └── knowledge/          # Base de conhecimento
+│   ├── data_collector.py    # Coleta dados para fine-tuning
+│   └── fine_tuner.py        # Pipeline de fine-tuning (opcional)
+└── web/
+    ├── app.py               # Rotas Flask
+    └── templates/
+        ├── index.html       # Interface principal (dark mode)
+        └── admin.html       # Painel de API Keys
 ```
 
-## 🔄 Ciclo de Aprendizado Progressivo
+## 🐳 Docker
 
-1. **Transcreve** consultas em tempo real
-2. **Armazena** transcrições + feedback do médico
-3. **Coleta** dados formatados para treinamento
-4. **Fine-tuna** o modelo com QLoRA (periódico)
-5. **Melhora** a cada ciclo — vocabulário médico, padrões, sugestões
+```bash
+docker build -t ipagent .
+docker run -p 5000:5000 ipagent
+```
 
-## 🔒 Privacidade
+## 📄 Licença
 
-- ✅ Tudo roda **localmente** — nenhum dado sai do seu computador
-- ✅ Sem APIs externas — sem custos de uso
-- ✅ Compatível com requisitos de sigilo médico
+Projeto em desenvolvimento — Dr. Paulo Guimarães Jr.

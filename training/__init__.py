@@ -1,1 +1,1 @@
-# IPagent Training Module
+# IPagent Lite - Training Data Collection

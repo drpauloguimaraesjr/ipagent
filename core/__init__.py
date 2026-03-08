@@ -1,1 +1,1 @@
-# IPagent Core Module
+# IPagent Lite - Core

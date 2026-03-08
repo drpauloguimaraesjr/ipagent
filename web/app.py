@@ -1,32 +1,30 @@
 """
-Servidor web Flask com WebSocket para interface do IPagent.
-Fornece UI para transcrição em tempo real e chat com o agente.
+Servidor web Flask do IPagent Lite.
+Versão leve: Flask puro (sem gevent, sem socketio pesado).
+Usa fetch API + Server-Sent Events para comunicação em tempo real.
 """
 
 import logging
 import json
 import time
-import threading
+import secrets
 import os
 from pathlib import Path
-import numpy as np
-from werkzeug.utils import secure_filename
+from datetime import datetime
+from functools import wraps
 
-from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 
 logger = logging.getLogger(__name__)
 
 
-def create_app(config, transcriber=None, agent=None, audio=None, memory=None, data_collector=None):
+def create_app(config, agent=None, memory=None, data_collector=None):
     """
-    Cria a aplicação Flask com todas as rotas e WebSocket.
+    Cria a aplicação Flask com todas as rotas.
     
     Args:
         config: WebConfig
-        transcriber: RealtimeTranscriber instance
         agent: MedicalAgent instance
-        audio: AudioCapture instance
         memory: KnowledgeMemory instance
         data_collector: DataCollector instance
     """
@@ -40,8 +38,6 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
     )
     app.config['SECRET_KEY'] = config.secret_key
 
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
-
     # Estado da sessão
     session_state = {
         "is_recording": False,
@@ -50,22 +46,8 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
     }
 
     # ==========================================
-    # Rotas HTTP
+    # API Keys Management
     # ==========================================
-
-    @app.route('/')
-    def index():
-        """Página principal."""
-        return render_template('index.html')
-
-    # ==========================================
-    # Lógica do Painel Administrador e API Keys
-    # ==========================================
-    import secrets
-    import os
-    import json
-    from datetime import datetime
-    from functools import wraps
 
     DATA_DIR = Path("data")
     DATA_DIR.mkdir(exist_ok=True)
@@ -85,7 +67,7 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
             json.dump(keys_list, f, indent=4)
 
     def validate_api_key(f):
-        """Decorador para proteger rotas. Se uma chave for enviada, ela é estritamente validada."""
+        """Decorador para proteger rotas com API key."""
         @wraps(f)
         def decorated(*args, **kwargs):
             auth = request.headers.get("Authorization")
@@ -94,82 +76,34 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
                 keys = load_keys()
                 is_valid = any(k["key"] == token and k.get("active", True) for k in keys)
                 if not is_valid:
-                    return jsonify({"error": "Acesso Negado: Chave de API inválida ou desativada no Painel Admin do IPagent."}), 403
-            # Nota: para manter o site UI atual (que não envia chave) funcionando, permitimos requests sem Auth.
-            # Numa versão de produção fechada, você exigiria Auth em todas as chamadas exceto originadas da UI.
+                    return jsonify({"error": "Chave de API inválida ou desativada."}), 403
             return f(*args, **kwargs)
         return decorated
 
+    # ==========================================
+    # Rotas de Página
+    # ==========================================
+
+    @app.route('/')
+    def index():
+        """Página principal."""
+        return render_template('index.html')
+
     @app.route('/admin')
     def admin_dashboard():
-        """Página do Painel de Controle de APIs."""
+        """Painel de Controle."""
         return render_template('admin.html')
 
-    @app.route('/api/admin/keys', methods=['GET'])
-    def get_api_keys():
-        """Lista todas as chaves."""
-        return jsonify({"keys": load_keys()})
-
-    @app.route('/api/admin/generate', methods=['POST'])
-    def create_api_key():
-        """Gera uma nova chave registrada."""
-        data = request.json or {}
-        name = data.get('name', 'Sistema Externo Desconhecido')
-        
-        new_key = f"sk-IPagent-{secrets.token_hex(16)}"
-        
-        key_record = {
-            "name": name,
-            "key": new_key,
-            "created_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "active": True
-        }
-        
-        keys = load_keys()
-        keys.append(key_record)
-        save_keys(keys)
-            
-        return jsonify({
-            "success": True, 
-            "api_key": new_key
-        })
-
-    @app.route('/api/admin/toggle', methods=['POST'])
-    def toggle_api_key():
-        """Desliga ou Liga uma chave."""
-        data = request.json or {}
-        key_to_toggle = data.get('key')
-        activate = data.get('active', True)
-        
-        keys = load_keys()
-        for k in keys:
-            if k["key"] == key_to_toggle:
-                k["active"] = activate
-                break
-        save_keys(keys)
-        return jsonify({"success": True})
-
-    @app.route('/api/admin/delete', methods=['POST'])
-    def delete_api_key():
-        """Deleta permanentemente uma chave."""
-        data = request.json or {}
-        key_to_delete = data.get('key')
-        
-        keys = load_keys()
-        keys = [k for k in keys if k["key"] != key_to_delete]
-        save_keys(keys)
-        return jsonify({"success": True})
-
-
+    # ==========================================
+    # API: Status
+    # ==========================================
 
     @app.route('/api/status')
     def api_status():
         """Status dos componentes do sistema."""
         status = {
-            "transcriber": {
-                "initialized": transcriber.is_initialized if transcriber else False,
-                "running": transcriber.is_running if transcriber else False,
-            },
+            "version": "ultra-lite",
+            "engine": "llama-cpp-python (sem Ollama)",
             "agent": {
                 "available": agent.is_available if agent else False,
             },
@@ -182,24 +116,88 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
                 "ready": data_collector.is_ready_for_training if data_collector else False,
                 "stats": data_collector.get_stats() if data_collector else {},
             },
-            "audio": {
-                "capturing": audio.is_capturing if audio else False,
-            },
+            "correction": {
+                "enabled": True,
+                "engine": "llama-cpp-python + Quick Dictionary"
+            }
         }
         return jsonify(status)
 
-    @app.route('/api/devices')
-    def api_devices():
-        """Lista dispositivos de áudio disponíveis."""
-        if audio:
-            devices = audio.list_devices()
-            return jsonify({"devices": devices})
-        return jsonify({"devices": [], "error": "Audio não inicializado"})
+    # ==========================================
+    # API: Transcrição + Correção Médica
+    # ==========================================
+
+    @app.route('/api/transcription/update', methods=['POST'])
+    def api_transcription_update():
+        """
+        Recebe texto transcrito pelo navegador e acumula.
+        O frontend envia trechos conforme o Speech Recognition retorna.
+        """
+        data = request.json or {}
+        text = data.get('text', '')
+        
+        if text.strip():
+            session_state["current_transcript"] += " " + text
+            session_state["is_recording"] = True
+            logger.info(f"📝 Recebido: {text[:50]}...")
+        
+        return jsonify({"success": True, "total_length": len(session_state["current_transcript"])})
+
+    @app.route('/api/transcription/correct', methods=['POST'])
+    @validate_api_key
+    def api_correct_transcription():
+        """
+        🧠 CAMADA DE CORREÇÃO MÉDICA
+        Recebe texto bruto do Speech Recognition e retorna corrigido.
+        Usa quick-fix + LLM para máxima precisão médica.
+        """
+        if not agent:
+            return jsonify({"error": "Agente não disponível"}), 503
+
+        data = request.json or {}
+        raw_text = data.get('text', '')
+
+        if not raw_text.strip():
+            return jsonify({"error": "Texto vazio"}), 400
+
+        result = agent.correct_transcription(raw_text)
+
+        # Se houve correção, registrar para futuro fine-tuning
+        if data_collector and result["original"] != result["corrected"]:
+            data_collector.add_transcription_correction(
+                original_transcription=result["original"],
+                corrected_transcription=result["corrected"],
+                quality_score=0.8,  # Auto-correção tem score padrão
+            )
+
+        return jsonify(result)
+
+    @app.route('/api/transcription/start', methods=['POST'])
+    def api_start_transcription():
+        """Inicia nova sessão de transcrição."""
+        session_state["is_recording"] = True
+        session_state["current_transcript"] = ""
+        session_state["consultation_id"] = f"consult_{int(time.time())}"
+        return jsonify({"success": True, "consultation_id": session_state["consultation_id"]})
+
+    @app.route('/api/transcription/stop', methods=['POST'])
+    def api_stop_transcription():
+        """Para a sessão de transcrição."""
+        session_state["is_recording"] = False
+        return jsonify({
+            "success": True,
+            "transcript": session_state["current_transcript"],
+            "length": len(session_state["current_transcript"])
+        })
+
+    # ==========================================
+    # API: Chat com Agente
+    # ==========================================
 
     @app.route('/api/chat', methods=['POST'])
     @validate_api_key
     def api_chat():
-        """Endpoint de chat com o agente."""
+        """Chat com o agente médico."""
         if not agent:
             return jsonify({"error": "Agente não disponível"}), 503
 
@@ -214,6 +212,36 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
             "response": response,
             "timestamp": time.time(),
         })
+
+    @app.route('/api/chat/stream', methods=['POST'])
+    @validate_api_key
+    def api_chat_stream():
+        """Chat com streaming via Server-Sent Events."""
+        if not agent:
+            return jsonify({"error": "Agente não disponível"}), 503
+
+        data = request.json
+        message = data.get('message', '')
+        use_context = data.get('use_context', True)
+        context = session_state["current_transcript"] if use_context else None
+
+        def generate():
+            for token in agent.chat_stream(message, context=context):
+                yield f"data: {json.dumps({'token': token})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+            }
+        )
+
+    # ==========================================
+    # API: Análise e SOAP
+    # ==========================================
 
     @app.route('/api/analyze', methods=['POST'])
     @validate_api_key
@@ -243,6 +271,10 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         soap = agent.generate_soap_note(transcript)
         return jsonify({"soap_note": soap})
 
+    # ==========================================
+    # API: Base de Conhecimento
+    # ==========================================
+
     @app.route('/api/save-consultation', methods=['POST'])
     def api_save_consultation():
         """Salva a consulta atual na base de conhecimento."""
@@ -263,6 +295,39 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         )
 
         return jsonify({"success": success})
+
+    @app.route('/api/upload-pdf', methods=['POST'])
+    def api_upload_pdf():
+        """Upload e indexação de PDF científico."""
+        if not memory:
+            return jsonify({"error": "Memória não disponível"}), 503
+
+        if 'file' not in request.files:
+            return jsonify({"error": "Nenhum arquivo enviado"}), 400
+
+        file = request.files['file']
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({"error": "Apenas arquivos PDF são aceitos"}), 400
+
+        # Salvar temporariamente
+        upload_dir = Path("data/uploads")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        safe_name = file.filename.replace(" ", "_")
+        file_path = upload_dir / safe_name
+        file.save(str(file_path))
+
+        # Indexar
+        success = memory.add_scientific_pdf(str(file_path))
+
+        if success:
+            return jsonify({"message": f"Artigo '{file.filename}' indexado com sucesso!"})
+        else:
+            return jsonify({"error": "Falha ao processar o PDF"}), 500
+
+    # ==========================================
+    # API: Feedback para Fine-tuning
+    # ==========================================
 
     @app.route('/api/feedback', methods=['POST'])
     def api_feedback():
@@ -308,92 +373,59 @@ def create_app(config, transcriber=None, agent=None, audio=None, memory=None, da
         return jsonify({"error": "Coletor não disponível"}), 503
 
     # ==========================================
-    # WebSocket Events
+    # API: Admin - Chaves de API
     # ==========================================
 
-    @socketio.on('connect')
-    def handle_connect():
-        """Cliente conectou."""
-        logger.info("🔌 Cliente WebSocket conectado")
-        emit('status', {'connected': True})
+    @app.route('/api/admin/keys', methods=['GET'])
+    def get_api_keys():
+        return jsonify({"keys": load_keys()})
 
-    @socketio.on('start_transcribing_from_web')
-    def handle_start_web_transcription(data):
-        """Inicia a transcrição recebendo áudio do navegador (VPS compatible)."""
-        if not transcriber:
-            emit('error', {'message': 'Transcritor não disponível'})
-            return
+    @app.route('/api/admin/generate', methods=['POST'])
+    def create_api_key():
+        data = request.json or {}
+        name = data.get('name', 'Sistema Externo')
 
-        session_state["is_recording"] = True
-        session_state["current_transcript"] = ""
-        transcriber.start_session()
-        
-        def on_transcription(segment):
-            session_state["current_transcript"] += " " + segment.text
-            socketio.emit('transcription_update', {
-                'text': segment.text
-            })
+        new_key = f"sk-IPagent-{secrets.token_hex(16)}"
+        key_record = {
+            "name": name,
+            "key": new_key,
+            "created_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "active": True
+        }
 
-        transcriber.on_transcription(on_transcription)
-        logger.info("🎙️ Recebendo streaming de áudio do navegador...")
+        keys = load_keys()
+        keys.append(key_record)
+        save_keys(keys)
 
-    @socketio.on('audio_chunk')
-    def handle_audio_chunk(data):
-        """Recebe pacotes PCM Int16 do navegador e envia pro Whisper."""
-        if not session_state["is_recording"] or not transcriber:
-            return
-            
-        try:
-            # Converter Int16Array Buffer to np.float32 array que Whispers espera
-            audio_array = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-            
-            # Aqui deveriamos acumular chunks até ter 2 segundos e depois enviar.
-            # Para simplificar na alteração do código:
-            # (Numa versao de produçao real voce gerencia o buffer aqui)
-            transcriber.transcribe_chunk(audio_array)
-            
-        except Exception as e:
-            logger.error(f"Erro processando chunk de web: {e}")
+        return jsonify({"success": True, "api_key": new_key})
 
-    @socketio.on('stop_transcribing_from_web')
-    def handle_stop_web_transcription():
-        """Para a transcrição do navegador."""
-        session_state["is_recording"] = False
-        if transcriber:
-            transcriber.stop_session()
-        logger.info("⏹️ Streaming de áudio do navegador parado")
+    @app.route('/api/admin/toggle', methods=['POST'])
+    def toggle_api_key():
+        data = request.json or {}
+        key_to_toggle = data.get('key')
+        activate = data.get('active', True)
 
-    @socketio.on('web_transcription_text')
-    def handle_web_transcription_text(data):
-        """Recebe texto transcrito nativamente pelo navegador Chrome/Safari."""
-        if session_state["is_recording"]:
-            text = data.get('text', '')
-            if text:
-                session_state["current_transcript"] += " " + text
-                logger.info(f"Recebido texto: {text}")
+        keys = load_keys()
+        for k in keys:
+            if k["key"] == key_to_toggle:
+                k["active"] = activate
+                break
+        save_keys(keys)
+        return jsonify({"success": True})
 
-    @socketio.on('chat_message')
-    def handle_chat_message(data):
-        """Mensagem de chat via WebSocket (com streaming)."""
-        if not agent:
-            emit('error', {'message': 'Agente não disponível'})
-            return
+    @app.route('/api/admin/delete', methods=['POST'])
+    def delete_api_key():
+        data = request.json or {}
+        key_to_delete = data.get('key')
 
-        message = data.get('message', '')
-        use_context = data.get('use_context', True)
-        context = session_state["current_transcript"] if use_context else None
+        keys = load_keys()
+        keys = [k for k in keys if k["key"] != key_to_delete]
+        save_keys(keys)
+        return jsonify({"success": True})
 
-        # Streaming response
-        emit('chat_start', {})
-        for token in agent.chat_stream(message, context=context):
-            emit('chat_token', {'token': token})
-        emit('chat_end', {})
+    # Rota legada para compatibilidade
+    @app.route('/api/generate-key', methods=['POST'])
+    def generate_key_legacy():
+        return create_api_key()
 
-    @socketio.on('disconnect')
-    def handle_disconnect():
-        """Cliente desconectou."""
-        logger.info("🔌 Cliente WebSocket desconectado")
-        if session_state["is_recording"]:
-            handle_stop_web_transcription()
-
-    return app, socketio
+    return app

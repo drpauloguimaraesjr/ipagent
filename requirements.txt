@@ -1,31 +1,19 @@
-# === Transcrição em Tempo Real ===
-faster-whisper>=1.1.0
-sounddevice>=0.5.0
-numpy>=1.24.0
-webrtcvad>=2.0.10
+# === IPagent Ultra-Lite ===
+# Tudo em um. Sem Ollama. Sem dependências externas.
+# Instale com: pip install -r requirements.txt
 
-# === LLM Local (Ollama) ===
-ollama>=0.4.0
+# === IA Local (direto no Python) ===
+llama-cpp-python>=0.3.0
 
-# === Base de Conhecimento (RAG) ===
-chromadb>=0.5.0
-sentence-transformers>=3.0.0
-PyMuPDF>=1.23.0  # Para ler PDFs de artigos científicos
+# === Download automático do modelo ===
+huggingface-hub>=0.20.0
+
+# === Leitor de PDFs (artigos científicos) ===
+PyMuPDF>=1.23.0
 
 # === Interface Web ===
 flask>=3.0.0
-flask-socketio>=5.3.0
-gevent>=24.0
-gevent-websocket>=0.10.1
-
-# === Fine-Tuning ===
-# Nota: unsloth deve ser instalado separadamente
-# pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
-# pip install --no-deps trl peft accelerate bitsandbytes
-datasets>=3.0.0
 
 # === Utilitários ===
 python-dotenv>=1.0.0
 rich>=13.0.0
-pydantic>=2.0.0
-posthog\nkubernetes\nbuild\nopentelemetry-exporter-otlp-proto-grpc
