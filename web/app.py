@@ -9,6 +9,7 @@ import json
 import time
 import secrets
 import os
+import threading
 from pathlib import Path
 from datetime import datetime
 from functools import wraps
@@ -43,6 +44,10 @@ def create_app(config, agent=None, memory=None, data_collector=None):
         "is_recording": False,
         "current_transcript": "",
         "consultation_id": None,
+        "current_anamnesis": "",
+        "anamnesis_generating": False,
+        "anamnesis_version": 0,
+        "custom_anamnesis_prompt": None,
     }
 
     # ==========================================
@@ -187,8 +192,133 @@ def create_app(config, agent=None, memory=None, data_collector=None):
         return jsonify({
             "success": True,
             "transcript": session_state["current_transcript"],
+            "anamnesis": session_state["current_anamnesis"],
             "length": len(session_state["current_transcript"])
         })
+
+    # ==========================================
+    # API: Anamnese em Tempo Real
+    # ==========================================
+
+    @app.route('/api/anamnesis/generate', methods=['POST'])
+    @validate_api_key
+    def api_generate_anamnesis():
+        """
+        📋 GERAÇÃO DE ANAMNESE EM TEMPO REAL
+        Recebe a transcrição acumulada e gera/atualiza o prontuário.
+        Funciona de forma incremental (atualiza a anamnese anterior).
+        """
+        if not agent:
+            return jsonify({"error": "Agente não disponível"}), 503
+
+        # Evitar chamadas concorrentes (trava)
+        if session_state["anamnesis_generating"]:
+            return jsonify({
+                "anamnesis": session_state["current_anamnesis"],
+                "status": "already_generating",
+                "version": session_state["anamnesis_version"]
+            })
+
+        data = request.json or {}
+        transcript = data.get('transcript', session_state["current_transcript"])
+        
+        if not transcript or len(transcript.strip()) < 20:
+            return jsonify({
+                "anamnesis": session_state["current_anamnesis"],
+                "status": "transcript_too_short",
+                "version": session_state["anamnesis_version"]
+            })
+
+        session_state["anamnesis_generating"] = True
+        logger.info("📋 Gerando anamnese...")
+
+        try:
+            anamnesis = agent.generate_anamnesis(
+                transcription=transcript,
+                previous_anamnesis=session_state["current_anamnesis"] or None,
+                custom_prompt=session_state["custom_anamnesis_prompt"],
+            )
+
+            session_state["current_anamnesis"] = anamnesis
+            session_state["anamnesis_version"] += 1
+
+            logger.info(f"✅ Anamnese v{session_state['anamnesis_version']} gerada ({len(anamnesis)} chars)")
+
+            return jsonify({
+                "anamnesis": anamnesis,
+                "status": "success",
+                "version": session_state["anamnesis_version"]
+            })
+
+        except Exception as e:
+            logger.error(f"❌ Erro na anamnese: {e}")
+            return jsonify({
+                "error": str(e),
+                "anamnesis": session_state["current_anamnesis"],
+                "status": "error",
+                "version": session_state["anamnesis_version"]
+            }), 500
+
+        finally:
+            session_state["anamnesis_generating"] = False
+
+    @app.route('/api/anamnesis/status')
+    def api_anamnesis_status():
+        """Retorna o status atual da anamnese (para polling do frontend)."""
+        return jsonify({
+            "anamnesis": session_state["current_anamnesis"],
+            "generating": session_state["anamnesis_generating"],
+            "version": session_state["anamnesis_version"],
+            "transcript_length": len(session_state["current_transcript"]),
+        })
+
+    @app.route('/api/anamnesis/prompt', methods=['GET', 'POST'])
+    def api_anamnesis_prompt():
+        """Permite ao médico personalizar o prompt da anamnese."""
+        if request.method == 'GET':
+            return jsonify({
+                "prompt": session_state["custom_anamnesis_prompt"] or agent.DEFAULT_ANAMNESIS_PROMPT if agent else "",
+            })
+        
+        data = request.json or {}
+        new_prompt = data.get('prompt', '')
+        if new_prompt.strip():
+            session_state["custom_anamnesis_prompt"] = new_prompt
+            return jsonify({"success": True, "message": "Prompt atualizado"})
+        else:
+            session_state["custom_anamnesis_prompt"] = None
+            return jsonify({"success": True, "message": "Prompt restaurado ao padrão"})
+
+    @app.route('/api/anamnesis/export')
+    def api_export_anamnesis():
+        """
+        Exporta a anamnese atual como texto.
+        Pode ser usado para copiar para o prontuário eletrônico.
+        """
+        anamnesis = session_state["current_anamnesis"]
+        if not anamnesis:
+            return jsonify({"error": "Nenhuma anamnese gerada"}), 404
+
+        transcript = session_state["current_transcript"]
+        consultation_id = session_state["consultation_id"] or "sem_id"
+
+        export_text = (
+            f"=== PRONTUÁRIO - IPagent ===\n"
+            f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+            f"Consulta: {consultation_id}\n"
+            f"{'=' * 40}\n\n"
+            f"{anamnesis}\n\n"
+            f"{'=' * 40}\n"
+            f"TRANSCRIÇÃO COMPLETA:\n\n{transcript}\n"
+        )
+
+        return Response(
+            export_text,
+            mimetype='text/plain',
+            headers={
+                'Content-Disposition': f'attachment; filename=prontuario_{consultation_id}.txt'
+            }
+        )
 
     # ==========================================
     # API: Chat com Agente

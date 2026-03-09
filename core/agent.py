@@ -276,6 +276,132 @@ class MedicalAgent:
             context=transcription
         )
 
+    # ==========================================
+    # GERAÇÃO DE ANAMNESE EM TEMPO REAL
+    # ==========================================
+
+    DEFAULT_ANAMNESIS_PROMPT = (
+        "Você é um assistente médico especializado em documentação clínica. "
+        "Analise a transcrição da consulta e preencha o prontuário abaixo. "
+        "Use APENAS informações que foram mencionadas na transcrição. "
+        "Se algo não foi dito, escreva 'não informado'. "
+        "Se receber uma anamnese anterior, ATUALIZE com as novas informações, "
+        "mantendo o que já estava correto.\n\n"
+        "---\n"
+        "[NOME DO PACIENTE]\n"
+        "(nome conforme detectado na consulta)\n\n"
+        "[QUEIXA PRINCIPAL]\n"
+        "(palavras do paciente)\n\n"
+        "[HISTÓRIA DA DOENÇA ATUAL]\n"
+        "(tempo de início, evolução, fatores agravantes e atenuantes, tratamentos anteriores)\n\n"
+        "[DADOS VITAIS]\n"
+        "- Altura:\n- Peso:\n- IMC:\n- PA:\n- FC:\n- Temperatura:\n- Saturação O2:\n\n"
+        "[MEDICAMENTOS EM USO]\n"
+        "(nome do medicamento – dose – frequência)\n\n"
+        "[ALERGIAS]\n"
+        "(a medicamentos, alimentos e ambientais – tipo de reação)\n\n"
+        "[PATOLOGIAS PREGRESSAS]\n"
+        "(diabetes, hipertensão, dislipidemia, doenças autoimunes, etc)\n\n"
+        "[CIRURGIAS PRÉVIAS]\n"
+        "(tipo de cirurgia – ano – intercorrências)\n\n"
+        "[HISTÓRICO FAMILIAR]\n"
+        "(câncer, diabetes, hipertensão, doenças neurológicas, etc)\n\n"
+        "[ESTILO DE VIDA]\n"
+        "- Álcool:\n- Tabagismo:\n- Atividade física:\n- Sono:\n\n"
+        "[HIPÓTESES DIAGNÓSTICAS]\n"
+        "(baseadas na queixa e achados)\n\n"
+        "[CONDUTA / PLANO]\n"
+        "(exames solicitados, medicamentos prescritos, orientações)\n"
+        "---"
+    )
+
+    def generate_anamnesis(
+        self,
+        transcription: str,
+        previous_anamnesis: Optional[str] = None,
+        custom_prompt: Optional[str] = None
+    ) -> str:
+        """
+        Gera ou atualiza a anamnese estruturada a partir da transcrição.
+        
+        Essa é a funcionalidade central do IPagent:
+        - Escuta a transcrição acumulada
+        - Preenche automaticamente o prontuário
+        - Atualiza incrementalmente a cada chamada
+        
+        Args:
+            transcription: Texto transcrito acumulado da consulta
+            previous_anamnesis: Anamnese gerada anteriormente (para atualização incremental)
+            custom_prompt: Prompt personalizado do médico (opcional)
+        
+        Returns:
+            Anamnese estruturada preenchida
+        """
+        if not self._is_available:
+            return "⚠️ Modelo não carregado. Aguarde a inicialização."
+
+        if not transcription or len(transcription.strip()) < 20:
+            return "⚠️ Transcrição muito curta para gerar anamnese."
+
+        prompt = custom_prompt or self.DEFAULT_ANAMNESIS_PROMPT
+
+        # Construir mensagem
+        user_content = prompt + "\n\n"
+
+        if previous_anamnesis and len(previous_anamnesis.strip()) > 50:
+            user_content += (
+                "=== ANAMNESE ANTERIOR (atualize com novas informações) ===\n"
+                f"{previous_anamnesis}\n\n"
+            )
+
+        user_content += (
+            "=== TRANSCRIÇÃO DA CONSULTA ===\n"
+            f"{transcription}\n\n"
+            "Preencha o prontuário acima com base na transcrição:"
+        )
+
+        try:
+            response = self._llm.create_chat_completion(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Você é um documentador médico. Sua tarefa é preencher "
+                            "um prontuário estruturado a partir da transcrição de uma "
+                            "consulta médica. Preencha APENAS com informações que "
+                            "foram ditas na consulta. Mantenha o formato estruturado."
+                        )
+                    },
+                    {"role": "user", "content": user_content}
+                ],
+                max_tokens=2048,
+                temperature=0.1,  # Baixa para ser fiel à transcrição
+            )
+
+            anamnesis = response["choices"][0]["message"]["content"].strip()
+
+            # Limpeza básica
+            # Remove prefixos que o modelo pode adicionar
+            prefixes_to_remove = [
+                "aqui está a anamnese preenchida:",
+                "anamnese preenchida:",
+                "prontuário preenchido:",
+                "com base na transcrição:",
+            ]
+            lower_anamnesis = anamnesis.lower()
+            for prefix in prefixes_to_remove:
+                if lower_anamnesis.startswith(prefix):
+                    anamnesis = anamnesis[len(prefix):].strip()
+                    break
+
+            return anamnesis
+
+        except Exception as e:
+            logger.error(f"Erro ao gerar anamnese: {e}")
+            if previous_anamnesis:
+                return previous_anamnesis  # Retorna a anterior se falhar
+            return f"⚠️ Erro ao gerar anamnese: {e}"
+
     @property
     def is_available(self) -> bool:
         return self._is_available

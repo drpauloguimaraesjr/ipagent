@@ -230,7 +230,7 @@
         .transcription-content::-webkit-scrollbar-track { background: transparent; }
         .transcription-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-        .transcript-empty {
+        .transcript-empty, .anamnesis-empty {
             text-align: center;
             margin-top: 80px;
             display: flex;
@@ -239,8 +239,82 @@
             gap: 12px;
         }
 
-        .transcript-empty svg { opacity: 0.15; }
-        .transcript-empty p { color: var(--text-muted); font-size: 14px; }
+        .transcript-empty svg, .anamnesis-empty svg { opacity: 0.15; }
+        .transcript-empty p, .anamnesis-empty p { color: var(--text-muted); font-size: 14px; }
+
+        /* Tab Buttons */
+        .tab-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            position: relative;
+        }
+        .tab-btn:hover { color: var(--text-primary); background: var(--bg-card-hover); }
+        .tab-btn.active {
+            color: var(--accent-blue);
+            border-bottom-color: var(--accent-blue);
+        }
+        .anamnesis-badge {
+            color: var(--accent-indigo);
+            font-size: 8px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* Anamnesis Content */
+        .anamnesis-content {
+            white-space: pre-wrap;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--text-primary);
+            padding: 4px 0;
+        }
+        .anamnesis-content .field-label {
+            color: var(--accent-indigo);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 12px;
+            display: block;
+        }
+        .anamnesis-content .field-value {
+            color: var(--text-primary);
+            display: block;
+            padding-left: 8px;
+            border-left: 2px solid var(--accent-indigo);
+            margin: 4px 0 8px 0;
+        }
+        .anamnesis-content .field-empty {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Insights Content */
+        .insights-list { list-style: none; padding: 0; }
+        .insight-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(59, 130, 246, 0.05));
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
         .correction-badge {
             display: inline-block;
@@ -570,24 +644,70 @@
 
     <!-- Main -->
     <main>
-        <!-- Left: Transcription -->
+        <!-- Left: Transcription + Prontuário (Two Tabs) -->
         <div class="panel transcription-panel">
             <div class="panel-header">
-                <div class="panel-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                    Transcrição ao Vivo
+                <div style="display:flex; gap:0; align-items:center;">
+                    <button class="tab-btn active" id="tab-transcription" onclick="switchTab('transcription')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                        Transcrição
+                    </button>
+                    <button class="tab-btn" id="tab-prontuario" onclick="switchTab('prontuario')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        Prontuário
+                        <span id="anamnesis-badge" class="anamnesis-badge" style="display:none;">●</span>
+                    </button>
+                    <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="8"></line></svg>
+                        Reflexões IA
+                        <span id="insights-badge" class="anamnesis-badge" style="display:none;">●</span>
+                    </button>
                 </div>
+
                 <div style="display:flex; gap:8px; align-items:center;">
                     <span id="correction-count" style="font-size:11px; color:var(--accent-teal); display:none;">0 correções</span>
-                    <button class="btn" style="font-size:11px; padding:6px 12px;" onclick="editForFineTuning()">Editar p/ Fine-tuning</button>
+                    <span id="anamnesis-status" style="font-size:11px; color:var(--accent-indigo); display:none;">
+                        <span class="spinner" style="width:10px;height:10px;border-width:1.5px;"></span> Gerando...
+                    </span>
+                    <span id="anamnesis-version" style="font-size:10px; color:var(--text-muted); display:none;">v0</span>
+                    <button class="btn" style="font-size:11px; padding:6px 12px;" id="btn-export-anamnesis" onclick="exportAnamnesis()" title="Exportar prontuário">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Exportar
+                    </button>
                 </div>
             </div>
 
-            <div id="transcription-container" class="transcription-content">
+            <!-- Tab Content: Transcrição -->
+            <div id="tab-content-transcription" class="transcription-content">
                 <div class="transcript-empty">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg>
                     <p>Clique em "Iniciar Consulta" para começar a gravar.</p>
                     <p style="font-size:12px; color: var(--text-muted);">A transcrição será corrigida em tempo real pela IA.</p>
+                </div>
+            </div>
+
+            <!-- Tab Content: Prontuário (Anamnese) -->
+            <div id="tab-content-prontuario" class="transcription-content" style="display:none;">
+                <div id="anamnesis-container" class="anamnesis-content">
+                    <div class="anamnesis-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                        <p>O prontuário será preenchido automaticamente</p>
+                        <p style="font-size:12px; color: var(--text-muted);">conforme a consulta avança.</p>
+                        <p style="font-size:11px; color: var(--accent-indigo); margin-top:8px;">
+                            IA preenche: Nome, QP, HDA, Medicamentos, Alergias, Dados Vitais...
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Reflexões da IA -->
+            <div id="tab-content-insights" class="transcription-content" style="display:none;">
+                <div id="insights-container">
+                    <div class="anamnesis-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="8"></line></svg>
+                        <p>Reflexões e insights da IA aparecerão aqui</p>
+                        <p style="font-size:12px; color: var(--text-muted);">Conexões, diagnósticos diferenciais e sugestões.</p>
+                    </div>
                 </div>
             </div>
 
@@ -680,6 +800,10 @@
         let correctionCount = 0;
         let correctionQueue = [];
         let isProcessingCorrection = false;
+        let anamnesisTimer = null;
+        let anamnesisVersion = 0;
+        let lastTranscriptLength = 0;
+        let insightsList = [];
 
         // ==========================================
         // UI ELEMENTS
@@ -688,7 +812,7 @@
         const recordText = document.getElementById('record-text');
         const statusDot = document.getElementById('connection-dot');
         const statusText = document.getElementById('connection-text');
-        const transcriptionContainer = document.getElementById('transcription-container');
+        const transcriptionContainer = document.getElementById('tab-content-transcription');
         const audioLevel = document.getElementById('audio-level');
         const chatMessages = document.getElementById('chat-messages');
         const chatForm = document.getElementById('chat-form');
@@ -938,8 +1062,13 @@
                 clearTranscript();
                 correctionCount = 0;
                 correctionCountEl.style.display = 'none';
+                lastTranscriptLength = 0;
+                insightsList = [];
 
                 fetch('/api/transcription/start', { method: 'POST' });
+
+                // Iniciar timer de anamnese automática (a cada 30s)
+                startAnamnesisTimer();
 
                 try {
                     speechRecognition.start();
@@ -952,12 +1081,18 @@
                 recordText.textContent = 'Iniciar Consulta';
                 audioLevel.style.width = '0%';
 
+                // Parar timer de anamnese
+                stopAnamnesisTimer();
+
                 if (speechRecognition) {
                     speechRecognition.stop();
                 }
 
                 const interim = transcriptionContainer.querySelector('.interim-text');
                 if (interim) interim.remove();
+
+                // Gerar anamnese final ao parar
+                generateAnamnesis();
 
                 fetch('/api/transcription/stop', { method: 'POST' });
             }
@@ -1122,6 +1257,157 @@
                     alert('✅ Correção salva para treinamento futuro!');
                 });
             }
+        }
+
+        // ==========================================
+        // TAB SWITCHING
+        // ==========================================
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.getElementById('tab-content-transcription').style.display = 'none';
+            document.getElementById('tab-content-prontuario').style.display = 'none';
+            document.getElementById('tab-content-insights').style.display = 'none';
+
+            // Deactivate all tabs
+            document.getElementById('tab-transcription').classList.remove('active');
+            document.getElementById('tab-prontuario').classList.remove('active');
+            document.getElementById('tab-insights').classList.remove('active');
+
+            // Activate selected
+            document.getElementById('tab-content-' + tabName).style.display = 'block';
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            // Clear badge when viewing
+            if (tabName === 'prontuario') {
+                document.getElementById('anamnesis-badge').style.display = 'none';
+            }
+            if (tabName === 'insights') {
+                document.getElementById('insights-badge').style.display = 'none';
+            }
+        }
+
+        // ==========================================
+        // ANAMNESE EM TEMPO REAL (sem travar!)
+        // ==========================================
+        function startAnamnesisTimer() {
+            // Gera anamnese a cada 30 segundos
+            anamnesisTimer = setInterval(() => {
+                const currentLen = transcriptionContainer.innerText.length;
+                // Só gera se teve texto novo significativo (>50 chars novos)
+                if (currentLen - lastTranscriptLength > 50) {
+                    generateAnamnesis();
+                    lastTranscriptLength = currentLen;
+                }
+            }, 30000); // 30 segundos
+        }
+
+        function stopAnamnesisTimer() {
+            if (anamnesisTimer) {
+                clearInterval(anamnesisTimer);
+                anamnesisTimer = null;
+            }
+        }
+
+        async function generateAnamnesis() {
+            const statusEl = document.getElementById('anamnesis-status');
+            const versionEl = document.getElementById('anamnesis-version');
+            const container = document.getElementById('anamnesis-container');
+            const badge = document.getElementById('anamnesis-badge');
+
+            statusEl.style.display = 'inline-flex';
+
+            try {
+                const res = await fetch('/api/anamnesis/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await res.json();
+
+                if (data.status === 'success' && data.anamnesis) {
+                    anamnesisVersion = data.version;
+                    renderAnamnesis(data.anamnesis);
+                    versionEl.textContent = 'v' + data.version;
+                    versionEl.style.display = 'inline';
+
+                    // Mostrar badge se não estiver na aba prontuário
+                    const prontuarioTab = document.getElementById('tab-prontuario');
+                    if (!prontuarioTab.classList.contains('active')) {
+                        badge.style.display = 'inline';
+                    }
+
+                    // Também gerar insight
+                    generateInsight();
+                }
+            } catch (err) {
+                console.warn('Erro ao gerar anamnese:', err);
+            } finally {
+                statusEl.style.display = 'none';
+            }
+        }
+
+        function renderAnamnesis(text) {
+            const container = document.getElementById('anamnesis-container');
+            // Formatar campos [CAMPO] com estilo especial
+            let html = text
+                .replace(/\[([^\]]+)\]/g, '<span class="field-label">$1</span>')
+                .replace(/não informado/gi, '<span class="field-empty">não informado</span>')
+                .replace(/\n/g, '<br>');
+
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // REFLEXÕES / INSIGHTS DA IA
+        // ==========================================
+        async function generateInsight() {
+            const container = document.getElementById('insights-container');
+            const badge = document.getElementById('insights-badge');
+
+            try {
+                const transcript = transcriptionContainer.innerText;
+                if (!transcript || transcript.length < 50) return;
+
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: 'Com base na transcrição atual, forneça UM insight clínico breve: uma conexão entre sintomas, diagnóstico diferencial sugerido, ou próximo passo recomendado. Seja conciso (máx 2 frases).',
+                        use_context: true
+                    })
+                });
+                const data = await res.json();
+
+                if (data.response) {
+                    insightsList.push(data.response);
+
+                    // Renderizar lista de insights
+                    let html = '<ul class="insights-list">';
+                    insightsList.forEach((insight, i) => {
+                        html += `<li class="insight-item">
+                            <strong style="color:var(--accent-indigo);">💡 Insight ${i + 1}</strong><br>
+                            ${insight}
+                        </li>`;
+                    });
+                    html += '</ul>';
+                    container.innerHTML = html;
+
+                    // Badge
+                    const insightsTab = document.getElementById('tab-insights');
+                    if (!insightsTab.classList.contains('active')) {
+                        badge.style.display = 'inline';
+                    }
+                }
+            } catch (err) {
+                console.warn('Erro ao gerar insight:', err);
+            }
+        }
+
+        // ==========================================
+        // EXPORTAR PRONTUÁRIO
+        // ==========================================
+        function exportAnamnesis() {
+            window.open('/api/anamnesis/export', '_blank');
         }
     </script>
 </body>
